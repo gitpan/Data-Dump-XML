@@ -1,0 +1,21 @@
+--- #YAML:1.0
+name:               Data-Dump-XML
+version:            1.11
+abstract:           ~
+author:
+    - Ivan Baktsheev <dot.and.thing@gmail.com>
+license:            unknown
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  0
+requires:
+    Class::Easy:  0.02
+    XML::LibXML:  1.6
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.48
+meta-spec:
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4
