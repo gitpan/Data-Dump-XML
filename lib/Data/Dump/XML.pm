@@ -1,6 +1,6 @@
 package Data::Dump::XML;
-# $Revision: 1.2 $
-# $Id: XML.pm,v 1.2 2009/06/07 09:18:35 apla Exp $
+# $Revision: 1.3 $
+# $Id: XML.pm,v 1.3 2009/06/07 20:25:32 apla Exp $
 # $Author: apla $
 
 use Class::Easy;
@@ -9,7 +9,7 @@ use Scalar::Util ();
 
 use XML::LibXML ();
 
-our $VERSION = 1.15;
+our $VERSION = 1.16;
 
 require XSLoader;
 XSLoader::load ('Data::Dump::XML', $VERSION);
@@ -89,7 +89,7 @@ sub dump_xml {
 	
 	# dump config options if any
 	foreach (qw(ref_element hash_element array_element empty_array empty_hash undef key_as_hash_element @key_as_attribute)) {
-		$root->setAttribute ($_, $self->{$_})
+		$root->setAttribute ("_$_", $self->{$_})
 			if $self->{$_} ne $defaults->{$_};
 	}
 	
@@ -185,7 +185,7 @@ sub simple_dump {
 			#	$rval->TO_XML;
 			#}
 
-			$tag->setAttribute (class => $class);
+			$tag->setAttribute (_class => $class);
 		}
 	}
 	
@@ -250,8 +250,8 @@ sub simple_dump {
 		}
 		
 		my $level_up = 0;
-		my $option_attr = $tag->getAttribute ('option');
-		if (defined $option_attr and $option_attr eq 'level-up') {
+		my $option_attr = $tag->getAttribute ('_opt');
+		if (defined $option_attr and $option_attr eq 'up') {
 			$level_up = 1;
 		}
 		
@@ -266,7 +266,7 @@ sub simple_dump {
 					$node = $tag->parentNode->addNewChild ('', $tag_name);
 				} else {
 					$node = $tag;
-					$tag->removeAttribute ('opt');
+					$tag->removeAttribute ('_opt');
 				}
 				# $tag->setAttribute ('idx', $idx);
 			} else {
@@ -372,12 +372,12 @@ sub dump_hashref_pp {
 			) {
 				$node = $tag->addNewChild ('', $key_name);
 				if (defined $key_prefix and $key_prefix eq '<') {
-					$node->setAttribute (opt => 'level-up');
+					$node->setAttribute (_opt => 'up');
 				}
 			}
 		} else {
 			$node = $tag->addNewChild ('', $self->{hash_element});
-			$node->setAttribute ('name', $key);
+			$node->setAttribute (_name => $key);
 		}
 		
 		$self->simple_dump ($$val, $node);
@@ -421,7 +421,7 @@ call:
 produces:
 
   <?xml version="1.0" encoding="utf-8"?>
-  <data class="Foo">
+  <data _class="Foo">
   	<a>1</a>
   	<b>
   		<c>

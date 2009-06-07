@@ -8,6 +8,8 @@ use IO::Easy;
 
 use Test::More qw(no_plan);
 
+use Benchmark;
+
 use_ok 'Data::Dump::XML';
 use_ok 'Data::Dump::XML::Parser';
 
@@ -24,26 +26,20 @@ my $contents = IO::Easy->new ($file_name)->as_file->contents;
 my $data;
 my $xml;
 
+$data = $parser->parse_string ($contents);
+$xml = $dumper->dump_xml ($data);
 
 for (0 .. 10) {
-
 	my $t = timer ("parsing file");
-	
 	$data = $parser->parse_string ($contents);
-	
-	$t->lap ('dumping');
-	
+	$t->lap ('dumping data');
 	$xml = $dumper->dump_xml ($data);
-	
 	$t->end;
-
 }
 
 my $file_name2 = $file_name;
 $file_name2 =~ s/xml\.xml/xml2\.xml/;
 
 IO::Easy->new ($file_name2)->as_file->store ($xml->toString(1));
-
-# warn Dumper $data;
 
 1;

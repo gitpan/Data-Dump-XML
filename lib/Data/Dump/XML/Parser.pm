@@ -33,22 +33,23 @@ package Data::Dump::XML::Parser;
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 #  ---
-#  $Id: Parser.pm,v 1.2 2009/06/07 09:18:35 apla Exp $
+#  $Id: Parser.pm,v 1.3 2009/06/07 20:25:32 apla Exp $
 #  ---
 
 use Class::Easy;
 
 use Scalar::Util ();
 
-use XML::LibXML::SAX;
 use base qw(XML::LibXML::SAX);
 
 use Data::Dump::XML;
 
+our $VERSION = 1.16;
+
+#*characters = \&Data::Dump::XML::characters;
+
 sub new {
 	my($class, %arg) = @_;
-	#$arg{Style} = "Data::Dump::XML::ParseStyle";
-	#$arg{Namespaces} = 0;
 	
 	Data::Dump::XML->new
 		unless defined $Data::Dump::XML::INSTANCE;
@@ -56,19 +57,21 @@ sub new {
 	$arg{defaults} = {%$Data::Dump::XML::defaults};
 	
 	return bless \%arg, $class;
-	#return $class->SUPER::new(%arg);
 }
 
 sub start_document {
 	my $p = shift;
 	
-	$p->{dump}->{data} = undef;
-	$p->{dump}->{stack} = [];
-	push @{ $p->{dump}->{stack} }, \$p->{dump}->{data};
+	# real restored data
+	$p->{data} = undef;
 	
-	$p->{dump}->{increment} = 0;
+	# data stack. used for control child/parent axe
+	$p->{stack} = [];
 	
-	$p->SUPER::start_document (@_);
+	push @{$p->{stack}}, \$p->{data};
+	
+	# current depth
+	$p->{depth} = 0;
 }
 
 sub start_element {
@@ -80,19 +83,18 @@ sub start_element {
 		values %{$element->{Attributes}};
 	my $tag  = $element->{LocalName};
 	
-	my $increment = \$p->{dump}->{increment};
-	$$increment++;
+	my $depth = \$p->{depth};
+	$$depth++;
 	
-	$p->{dump}->{max_depth} = $$increment;
+	$p->{max_depth} = $$depth;
 	
-	if ($$increment == 1) {
+	if ($$depth == 1) {
 		# warn $tag;
-		foreach (qw(ref_element hash_element array-element
-			key-as-hash-element empty-array empty_hash undef)
+		foreach (qw(ref_element hash_element array_element empty_array
+			empty_hash undef key_as_hash_element @key_as_attribute)
 		) {
-			# TODO: make threadsafe
-			$d->{$_} = $attr{$_} 
-				if exists $attr{$_};
+			$d->{$_} = delete $attr{"_$_"} 
+				if exists $attr{"_$_"};
 		}
 	}
 	
@@ -109,79 +111,76 @@ sub start_element {
 	$blesser = $p->{Blesser}
 		if (exists $p->{Blesser} and ref($blesser) eq "CODE");
 	
+	my $parent_attr  = $p->{attr}->[-1];
+	my $parent_class = delete $parent_attr->{_class};
+	my $parent_id    = delete $parent_attr->{_id};
 	
-	my $attr = shift @{$p->{dump}->{attr}};
-	my $parent_class = $attr->{class};
-	my $parent_id    = $attr->{id};
-	
-	my $ref = $p->{'dump'}->{'stack'}->[-1];
+	my $ref = $p->{'stack'}->[-1];
 	
 	#my $defined_parent = 0;
 	#$defined_parent = 1
-	#	if  ref $p->{'dump'}->{'stack'}->[-1] eq 'SCALAR'
-	#		and not defined ${$p->{'dump'}->{'stack'}->[-1]};
+	#	if  ref $p->{'stack'}->[-1] eq 'SCALAR'
+	#		and not defined ${$p->{'stack'}->[-1]};
 	
-	push ( @{$p->{'dump'}->{'attr'}}, \%attr);
+	push (@{$p->{'attr'}}, \%attr);
 	
-	if ($tag eq $root_name and $$increment == 1)# and not defined $ref) {
-	{
+	if ($$depth == 1) {# and not defined $ref) {
+		# root element
 	} elsif ($tag eq $array_element) {
 		#$$ref = []
 		#	if $defined_parent;
 		
 		###  check the data type
 		die "'$tag' elements only appear in list elements" 
-			unless not defined $$ref 
-				or Scalar::Util::reftype ($$ref) eq 'ARRAY';
+			if defined $$ref and Scalar::Util::reftype ($$ref) ne 'ARRAY';
 		
 		push @{$$ref}, undef;
-		push @{$p->{'dump'}->{'stack'}}, \($$ref->[-1]);
+		push @{$p->{'stack'}}, \($$ref->[-1]);
 		
 		$blesser ? &$blesser ($$ref, $parent_class) : bless ($$ref, $parent_class)
-			if defined $parent_class;		  
+			if defined $parent_class;
+
 		
 	} elsif ($tag eq $ref_element) {
 		my $value = undef;
 		$$ref = \$value;
 		
-		$$ref = ${$p->{'dump'}->{'id'}->[$attr{'to'}]}
+		$$ref = ${$p->{'id'}->[$attr{'to'}]}
 			if (defined $attr{'to'});
 		
-		push @{$p->{'dump'}->{'stack'}}, $$ref;
+		push @{$p->{'stack'}}, $$ref;
 	
 	} elsif ($tag eq $undef) {
 	
 		$$ref = undef;
-		push @{$p->{'dump'}->{'stack'}}, undef;
+		push @{$p->{'stack'}}, undef;
 	
 	} elsif ($tag eq $empty_hash) {
 	
 		$$ref = {};
-		push @{$p->{'dump'}->{'stack'}}, undef;
+		push @{$p->{'stack'}}, undef;
 	
 	} elsif ($tag eq $empty_array) {
 	
 		$$ref = [];
-		push @{$p->{'dump'}->{'stack'}}, undef;
+		push @{$p->{'stack'}}, undef;
 	
-	} elsif ($key_as_hash_element
-	  or ($tag eq $hash_element and exists $attr{'name'})) {
+	} elsif ($key_as_hash_element or ($tag eq $hash_element and exists $attr{_name})) {
 		#$$ref = {}
 		#	if $defined_parent;
 		
 		my $key = $tag;
-		$key = $attr{'name'}
-			if exists $attr{'name'};
+		$key = $attr{_name}
+			if exists $attr{_name};
 		
 		die "hash element '$key' must appear in hash context" 
-			unless not defined $$ref 
-				or Scalar::Util::reftype ($$ref) eq 'HASH';
+			if defined $$ref and Scalar::Util::reftype ($$ref) ne 'HASH';
 		
 		unless (defined $$ref) {
-			# copy all attributes except d:*
-			foreach my $k (keys %$attr) {
-				next if $k =~ /^d\:/;
-				$$ref->{"\@$k"} = $attr->{$k}; 
+			# copy all attributes except :*
+			foreach my $k (keys %$parent_attr) {
+				# next if substr ($k, 0, 1) eq '_';
+				$$ref->{"\@$k"} = $parent_attr->{$k}; 
 			}
 		}
 		
@@ -189,7 +188,7 @@ sub start_element {
 			if exists $$ref->{$key};
 		$$ref->{$key} = undef;
 		
-		push @{$p->{dump}->{stack}}, \(${$ref}->{$key});
+		push @{$p->{stack}}, \(${$ref}->{$key});
 		
 		$blesser ? &$blesser ($$ref, $parent_class) : bless ($$ref, $parent_class)
 			if defined $parent_class;
@@ -197,22 +196,19 @@ sub start_element {
 		warn "found unknown element $tag";
 	}
 	
+	# mix of pcdata and elements not allowed, ignore chars
+	$p->{char} = '';
 	
-	$p->{dump}->{char} = '';
-	
-	$p->{dump}->{id}->[$parent_id] = $ref
+	$p->{id}->[$parent_id] = $ref
 		if ($parent_id);
-	
-	$p->SUPER::start_element ($element);
-
 }
 
 sub characters {
 	my ($p, $str) = @_;
-	$p->{'dump'}->{'char'} .= $str->{'Data'}
-		if defined $str->{'Data'} and $str->{'Data'} ne '';
+	$p->{'char'} .= $str->{'Data'}
+		if defined $str->{'Data'} and $str->{'Data'} !~ /^\s$/s;
 	
-	$p->SUPER::characters ($str);
+	# $p->SUPER::characters ($str);
 }
 
 sub end_element {
@@ -220,50 +216,64 @@ sub end_element {
 	
 	my $d = $p->{defaults};
 	
-	my $tag   = $element->{'LocalName'};
+	my $tag = $element->{'LocalName'};
 	
-	my $increment = \$p->{'dump'}->{'increment'};
-	my $str = $p->{'dump'}->{'char'};
-	my $ref = pop @{ $p->{'dump'}->{'stack'} };
+	my $depth = \$p->{depth};
+	my $str = $p->{'char'};
+	my $ref = pop @{$p->{'stack'}};
 	
-	$p->{'dump'}->{'char'} = '';
+	$p->{'char'} = '';
 	
-	my $attr = $p->{'dump'}->{'attr'}->[0];
-	my $attributed_keys = {map {$_ => $attr->{$_}} grep {!/^d\:/} keys %$attr};
+	my $attr = pop @{$p->{'attr'}};
+	my $attributed_keys = {map {$_ => $attr->{$_}} grep {!/^_/} keys %$attr};
 	
 	my $empty_array_item_as_hash = scalar keys %$attributed_keys;
 	
-	if( $$increment < $p->{dump}->{max_depth}) {
-		#print ' 'x $$increment, "- this element had children\n";
-	} elsif ($tag eq $d->{array_element} and $empty_array_item_as_hash) {
-		$$ref->{'#text'} = $str
-			if defined $str and $str ne '';
-
-		foreach my $k (keys %$attributed_keys) {
-			$$ref->{"\@$k"} = $attributed_keys->{$k}; 
-		}
-
-	} elsif ($tag ne $d->{'undef'}) {
-		if ($tag eq $d->{ref_element} and $p->{'dump'}->{'attr'}->[0]->{'to'}) {
-#	  print "'", $p->{'dump'}->{'attr'}->[0]->{'to'}, "'\n";
-#	  my $place = $p->{'dump'}->{'attr'}->[0]->{'to'};
-#	  
-#	  $$ref = ${$p->{'dump'}->{'id'}->[$place]}
-#	   if (defined $place);
-	  
-		} else {
-			#print ' 'x $$increment, "element '$tag' holds a string value ('$str')\n";
-			$$ref = $str;
-		}
-	}
-	$$increment--;
+	if( $$depth < $p->{max_depth}) {
+		#print ' 'x $$depth, "- this element had children\n";
+	} else {
+		# here processing for empty tags
+		
+		if ($tag eq $d->{array_element} and $empty_array_item_as_hash) {
+			$$ref->{'#text'} = $str
+				if defined $str and $str ne '';
 	
-	$p->SUPER::end_element ($element);
+			foreach my $k (keys %$attributed_keys) {
+				$$ref->{"\@$k"} = $attributed_keys->{$k};
+			}
+	
+		} elsif ($tag ne $d->{'undef'}) {
+			if ($tag eq $d->{ref_element} and $attr->{'to'}) {
+	#	  print "'", $p->{'attr'}->[0]->{'to'}, "'\n";
+	#	  my $place = $p->{'attr'}->[0]->{'to'};
+	#	  
+	#	  $$ref = ${$p->{'id'}->[$place]}
+	#	   if (defined $place);
+		  
+			} else {
+				#print ' 'x $$depth, "element '$tag' holds a string value ('$str')\n";
+				$$ref = $str;
+			}
+		}
+
+		my $class = $attr->{_class};
+		
+		my $blesser;
+		$blesser = $p->{Blesser}
+			if (exists $p->{Blesser} and ref ($blesser) eq "CODE");
+
+		$blesser ? &$blesser ($$ref, $class) : bless ($$ref, $class)
+			if defined $class and ref $$ref;
+
+	}
+	$$depth--;
+	
+	# $p->SUPER::end_element ($element);
 }
 
 sub end_document {
 	my $p = shift;
-	my $data = $p->{'dump'}->{'data'};
+	my $data = $p->{'data'};
 	
 	#$p->SUPER::end_document (@_);
 	return $data;

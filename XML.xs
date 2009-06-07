@@ -2,10 +2,44 @@
 #include "perl.h"
 #include "XSUB.h"
 
-#define 	IS_LETTER(c)   ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
-#define IS_DIGIT(c)	(((0x30 <= (c)) && ((c) <= 0x39)))
-
 MODULE = Data::Dump::XML PACKAGE = Data::Dump::XML
+
+void
+characters (p, str)
+    HV * p
+    HV * str
+PREINIT:
+	SV **  val_p;
+	SV *   val;
+	char * val_str;
+	int last_sig;
+	char * value;
+	SV **  hash_p;
+CODE:
+{
+	val_p = hv_fetch (str, "Data", 4, 0);
+	if (val_p) {
+		val_str = SvPVX (*val_p);
+		while (*val_str) {
+			if (!isSPACE (*val_str)) {
+				value = val_str;
+				break;
+			}
+			val_str++;
+		}
+	}
+	
+	# warn ("strlen is: %d", strlen (value));
+	
+	if (strlen (value)) {
+		hash_p = hv_fetch (p, "char", 4, 0);
+		if (hash_p) {
+			# warn ("add string %s to string %s", SvPVX (*hash_p), value);
+			sv_setpvf (*hash_p, "%s%s", SvPVX (newSVsv (*hash_p)), value);
+		}
+	}
+}
+
 
 void
 ref_info (sv)
@@ -91,14 +125,14 @@ dump_hashref (self, rval, keys, tag, class, type, id)
 			key_walk = key_name;
 			
 			if (key_walk == NULL || *key_walk == '\0' || !(
-				IS_LETTER (*key_walk) || *key_walk == '_' || *key_walk == ':'
+				isALPHA (*key_walk) || *key_walk == '_' || *key_walk == ':'
 			)) key_can_used_as_tag = 0;
 			
 			key_walk++;
 			
 			while (*key_walk != '\0') {
 				if (!(
-					IS_LETTER (*key_walk) || IS_DIGIT (*key_walk) 
+					isALPHA (*key_walk) || isDIGIT (*key_walk) 
 					|| *key_walk == '_' || *key_walk == ':'
 					|| *key_walk == '-' || *key_walk == '.'
 				)) {
@@ -133,6 +167,7 @@ key_info (self, hashref, key, val)
 		STRLEN len ;
 		char * key_walk;
 		bool key_can_be_tag = 1;
+		bool namespace = 0;
 	PPCODE:
 		// warn ("key count is: %d\n", keys_len);
 		
@@ -168,6 +203,9 @@ key_info (self, hashref, key, val)
 			isALPHA (*key_walk) || *key_walk == '_' || *key_walk == ':'
 		)) key_can_be_tag = 0;
 		
+		if (*key_walk == ':')
+			namespace = 1;
+		
 		key_walk++;
 		
 		while (*key_walk != '\0') {
@@ -179,6 +217,14 @@ key_info (self, hashref, key, val)
 				key_can_be_tag = 0;
 				break;
 			}
+			
+			if (*key_walk == ':') {
+				if (namespace == 1) {
+					key_can_be_tag = 0;
+					break;
+				}
+				namespace = 1;
+			} 
 			key_walk++;
 		}
 		

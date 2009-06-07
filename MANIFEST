@@ -9,6 +9,7 @@ t/000-basic-dump.t
 t/001-key_info.t
 t/002-ref_info.t
 t/003-large.t
+t/benchmark.pl
 t/xml.xml
 ppport.h
 XML.xs

@@ -42,14 +42,30 @@ $t = timer ("dumping structure");
 
 $xml = $dumper->dump_xml ($data);
 
-diag $xml->toString (1);
+# diag $xml->toString (1);
 
 $t->end;
 
 ok $xml->toString =~ m|<a>1</a><b><item ttt="25"/><item>3</item><item>4</item><item>5</item>|;
 ok $xml->toString =~ m|<c d="30"><e>15</e></c>|;
 
-$parser = Data::Dump::XML::Parser->new;
+$parsed = $parser->parse_string ($xml->toString);
+
+ok $parsed->{c}->{'@d'} eq 30;
+
+$data = bless {a => 1, b => [bless ({'@ttt' => 25, '#text' => ''}, 'Foo'), 3, 4, 5]}, 'Bar';
+
+$t = timer ("dumping structure");
+
+$xml = $dumper->dump_xml ($data);
+
+diag $xml->toString (1);
+
+$t->end;
+
+ok $xml->toString =~ m|<data _class="Bar"|;
+
+ok $xml->toString =~ m|<a>1</a><b><item _class="Foo" ttt="25"/><item>3</item><item>4</item><item>5</item>|;
 
 $parsed = $parser->parse_string ($xml->toString);
 
@@ -57,7 +73,9 @@ warn Dumper $parsed;
 
 ok $parsed->{b}->[0]->{'@ttt'} eq 25;
 
-ok $parsed->{c}->{'@d'} eq 30;
+ok ref $parsed eq 'Bar';
+
+ok ref $parsed->{b}->[0] eq 'Foo';
 
 $dumper = Data::Dump::XML->new (root_name => 'rss');
 

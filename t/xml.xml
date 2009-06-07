@@ -26,7 +26,6 @@
       <undef/>
     </dir_info>
     <params class="CGI::Minimal">
-      <key name="CGI::Minimal">
         <field_names>
           <empty-array/>
         </field_names>
@@ -37,7 +36,6 @@
         <field>
           <empty-hash/>
         </field>
-      </key>
     </params>
     <screen class="Web::App::Config::Screen">
       <process_calls>

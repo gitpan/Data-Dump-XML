@@ -1,5 +1,16 @@
 2009-06-07	Ivan Baktsheev <dot.and.thing@gmail.com>
 
+	Release 1.16
+
+	Resolved various old bugs
+	
+	Parser cleanup
+	
+	Added benchmark
+
+
+2009-06-07	Ivan Baktsheev <dot.and.thing@gmail.com>
+
 	Release 1.15
 
 	More speed improvements (XS)
