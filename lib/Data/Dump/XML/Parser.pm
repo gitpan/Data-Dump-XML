@@ -33,17 +33,17 @@ package Data::Dump::XML::Parser;
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 #  ---
-#  $Id: Parser.pm,v 1.7 2009/06/04 14:05:08 apla Exp $
+#  $Id: Parser.pm,v 1.2 2009/06/07 09:18:35 apla Exp $
 #  ---
 
 use Class::Easy;
+
+use Scalar::Util ();
 
 use XML::LibXML::SAX;
 use base qw(XML::LibXML::SAX);
 
 use Data::Dump::XML;
-
-our $defaults = $Data::Dump::XML::defaults;
 
 sub new {
 	my($class, %arg) = @_;
@@ -53,6 +53,8 @@ sub new {
 	Data::Dump::XML->new
 		unless defined $Data::Dump::XML::INSTANCE;
 	
+	$arg{defaults} = {%$Data::Dump::XML::defaults};
+	
 	return bless \%arg, $class;
 	#return $class->SUPER::new(%arg);
 }
@@ -60,11 +62,11 @@ sub new {
 sub start_document {
 	my $p = shift;
 	
-	$p->{'dump'}->{'data'} = undef;
-	$p->{'dump'}->{'stack'} = [];
-	push( @{ $p->{'dump'}->{'stack'} }, \$p->{'dump'}->{'data'} );
+	$p->{dump}->{data} = undef;
+	$p->{dump}->{stack} = [];
+	push @{ $p->{dump}->{stack} }, \$p->{dump}->{data};
 	
-	$p->{'dump'}->{'increment'} = 0;
+	$p->{dump}->{increment} = 0;
 	
 	$p->SUPER::start_document (@_);
 }
@@ -72,41 +74,45 @@ sub start_document {
 sub start_element {
 	my ($p, $element) = @_;
 	
-	my %attr = map {$_->{'LocalName'} => $_->{'Value'}} values %{$element->{'Attributes'}};
-	my $tag  = qq{$element->{LocalName}};
+	my $d = $p->{defaults};
 	
-	my $increment = \$p->{'dump'}->{'increment'};
+	my %attr = map {$_->{LocalName} => $_->{Value}}
+		values %{$element->{Attributes}};
+	my $tag  = $element->{LocalName};
+	
+	my $increment = \$p->{dump}->{increment};
 	$$increment++;
 	
-	$p->{'dump'}->{'max-depth'} = $$increment;
+	$p->{dump}->{max_depth} = $$increment;
 	
 	if ($$increment == 1) {
 		# warn $tag;
-		foreach (('ref-element', 'hash-element',
-			'array-element', 'key-as-hash-element', 'empty-array',
-			'empty-hash', 'undef')) {
-			$defaults->{$_} = $attr{$_} 
+		foreach (qw(ref_element hash_element array-element
+			key-as-hash-element empty-array empty_hash undef)
+		) {
+			# TODO: make threadsafe
+			$d->{$_} = $attr{$_} 
 				if exists $attr{$_};
 		}
 	}
 	
-	my $key_as_hash_element = $defaults->{'key-as-hash-element'};
-	my $root_name     = $defaults->{'root-name'};
-	my $ref_element   = $defaults->{'ref-element'};
-	my $array_element = $defaults->{'array-element'};
-	my $hash_element  = $defaults->{'hash-element'};
-	my $empty_array   = $defaults->{'empty-array'};
-	my $undef         = $defaults->{'undef'};
-	my $empty_hash    = $defaults->{'empty-hash'};
+	my $key_as_hash_element = $d->{'key_as_hash_element'};
+	my $root_name     = $d->{'root_name'};
+	my $ref_element   = $d->{'ref_element'};
+	my $array_element = $d->{'array_element'};
+	my $hash_element  = $d->{'hash_element'};
+	my $empty_array   = $d->{'empty_array'};
+	my $undef         = $d->{'undef'};
+	my $empty_hash    = $d->{'empty_hash'};
 	
 	my $blesser;
 	$blesser = $p->{Blesser}
 		if (exists $p->{Blesser} and ref($blesser) eq "CODE");
 	
 	
-	my $attr = shift @{$p->{'dump'}->{'attr'}};
-	my $parent_class = $attr->{'class'};
-	my $parent_id    = $attr->{'id'};
+	my $attr = shift @{$p->{dump}->{attr}};
+	my $parent_class = $attr->{class};
+	my $parent_id    = $attr->{id};
 	
 	my $ref = $p->{'dump'}->{'stack'}->[-1];
 	
@@ -126,7 +132,7 @@ sub start_element {
 		###  check the data type
 		die "'$tag' elements only appear in list elements" 
 			unless not defined $$ref 
-				or overload::StrVal ($$ref) =~ /^(?:[^=]+=)?ARRAY\(/;
+				or Scalar::Util::reftype ($$ref) eq 'ARRAY';
 		
 		push @{$$ref}, undef;
 		push @{$p->{'dump'}->{'stack'}}, \($$ref->[-1]);
@@ -169,7 +175,15 @@ sub start_element {
 		
 		die "hash element '$key' must appear in hash context" 
 			unless not defined $$ref 
-				or overload::StrVal ($$ref) =~ /^(?:[^=]+=)?HASH\(/;
+				or Scalar::Util::reftype ($$ref) eq 'HASH';
+		
+		unless (defined $$ref) {
+			# copy all attributes except d:*
+			foreach my $k (keys %$attr) {
+				next if $k =~ /^d\:/;
+				$$ref->{"\@$k"} = $attr->{$k}; 
+			}
+		}
 		
 		die "hash element '$key' already present" 
 			if exists $$ref->{$key};
@@ -193,17 +207,18 @@ sub start_element {
 
 }
 
-
-
 sub characters {
 	my ($p, $str) = @_;
-	$p->{'dump'}->{'char'} .= $str->{'Data'};
+	$p->{'dump'}->{'char'} .= $str->{'Data'}
+		if defined $str->{'Data'} and $str->{'Data'} ne '';
 	
 	$p->SUPER::characters ($str);
 }
 
 sub end_element {
 	my ($p, $element) = @_;
+	
+	my $d = $p->{defaults};
 	
 	my $tag   = $element->{'LocalName'};
 	
@@ -213,11 +228,23 @@ sub end_element {
 	
 	$p->{'dump'}->{'char'} = '';
 	
-	if( $$increment < $p->{'dump'}->{'max-depth'}) {
-		#print ' 'x $$increment, "- this element had children\n";
+	my $attr = $p->{'dump'}->{'attr'}->[0];
+	my $attributed_keys = {map {$_ => $attr->{$_}} grep {!/^d\:/} keys %$attr};
 	
-	} elsif ( $tag ne $defaults->{'undef'}) {
-		if ($tag eq $defaults->{'ref-element'} and $p->{'dump'}->{'attr'}->[0]->{'to'}) {
+	my $empty_array_item_as_hash = scalar keys %$attributed_keys;
+	
+	if( $$increment < $p->{dump}->{max_depth}) {
+		#print ' 'x $$increment, "- this element had children\n";
+	} elsif ($tag eq $d->{array_element} and $empty_array_item_as_hash) {
+		$$ref->{'#text'} = $str
+			if defined $str and $str ne '';
+
+		foreach my $k (keys %$attributed_keys) {
+			$$ref->{"\@$k"} = $attributed_keys->{$k}; 
+		}
+
+	} elsif ($tag ne $d->{'undef'}) {
+		if ($tag eq $d->{ref_element} and $p->{'dump'}->{'attr'}->[0]->{'to'}) {
 #	  print "'", $p->{'dump'}->{'attr'}->[0]->{'to'}, "'\n";
 #	  my $place = $p->{'dump'}->{'attr'}->[0]->{'to'};
 #	  

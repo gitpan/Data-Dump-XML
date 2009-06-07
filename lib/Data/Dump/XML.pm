@@ -1,43 +1,47 @@
 package Data::Dump::XML;
-# $Revision: 1.11 $
-# $Id: XML.pm,v 1.11 2009/06/04 14:08:54 apla Exp $
+# $Revision: 1.2 $
+# $Id: XML.pm,v 1.2 2009/06/07 09:18:35 apla Exp $
 # $Author: apla $
 
 use Class::Easy;
 
-use UNIVERSAL;
+use Scalar::Util ();
 
-use XML::LibXML;
+use XML::LibXML ();
+
+our $VERSION = 1.15;
+
+require XSLoader;
+XSLoader::load ('Data::Dump::XML', $VERSION);
 
 our $defaults = {
 	# xml configuration
-	'encoding'            => 'utf-8',
-	'dtd-location'        => '',
-	'namespace'           => {},
+	encoding            => 'utf-8',
+	dtd_location        => '',
+	namespace           => {},
 	
 	# xml tree namespace
-	'dump-config'         => 1,
-	'root-name'           => 'data',
-	'hash-element'        => 'key',
-	'array-element'       => 'item',
-	'ref-element'         => 'ref',
-	'empty-array'         => 'empty-array',
-	'empty-hash'          => 'empty-hash',
-	'undef'               => 'undef',
-	'key-as-hash-element' => 1,
-	'@key-as-attribute'   => 1,
+	dump_config         => 1,
+	root_name           => 'data',
+	hash_element        => 'key',
+	array_element       => 'item',
+	ref_element         => 'ref',
+	empty_array         => 'empty-array',
+	empty_hash          => 'empty-hash',
+	undef               => 'undef',
+	key_as_hash_element => 1,
+	'@key_as_attribute' => 1,
 	
 	# options
-	'sort-keys'           => 0,
+	sort_keys           => 0,
+	granted_restore     => 1,
 	
 	# internal structure
-	'doc-object'          => undef,
-	'references'          => {},
-	'ref-count'           => 0,
-	'used'                => {},
+	doc_object          => undef,
+	references          => {},
+	ref_count           => 0,
+	used                => {},
 };
-
-our $VERSION = 1.11;
 
 1;
 ############################################################
@@ -58,60 +62,6 @@ sub new {
 	return $config;
 }
 ############################################################
-sub refs {
-	my $self	= shift;
-	my $address = shift;
-	my $analyse = shift || 0;
-	
-	my $refs = $self->{'references'};
-	
-	return $refs->{$address}
-		unless $analyse;
-	
-	if (defined $refs->{$address}) {
-		$refs->{$address} = ++ $self->{'ref-count'}
-			if $refs->{$address} == 0;
-		return 1;
-	} else {
-		$refs->{$address} = 0;
-		return 0;
-	}
-}
-############################################################
-sub analyze {
-	my $self	  = shift;
-	my $structure = shift;
-	
-	return unless defined $structure;
-	
-	return unless ref $structure;
-	
-	return unless "$structure" =~ /^(?:([^=]+)=)?([A-Z]+)\(0x([^\)]+)\)$/;
-	
-	my ($type, $address) = ($2, $3);
-	
-	unless ($self->refs ($address, 1)) {
-		
-		if (UNIVERSAL::isa($type, 'HASH')) {
-			# warn "is hash";
-
-			foreach (values %$structure) {
-				$self->analyze ($_);
-			}
-
-		} elsif (UNIVERSAL::isa($type, 'ARRAY')) {
-			# warn "is array";
-			
-			foreach (@$structure) {
-				$self->analyze ($_);
-			}
-		} elsif (UNIVERSAL::isa($type, 'REF')) {
-			# warn "is ref";
-			$self->analyze ($$structure);
-		}
-	}
-}
-############################################################
 sub dump_xml {
 	my $self = shift;
 
@@ -123,38 +73,38 @@ sub dump_xml {
 		$structure = \@_;
 	}
 	
-	my $dom = XML::LibXML->createDocument ('1.0', $self->{'encoding'});
+	my $dom = XML::LibXML->createDocument ('1.0', $self->{encoding});
 	
-	$self->{'doc-object'} = $dom;
+	$self->{doc_object} = $dom;
 	
 	my $root;
 	
-	if ($self->{'dtd-location'} ne '') { 
-		$dom->createInternalSubset ('data', undef, $self->{'dtd-location'});
+	if ($self->{dtd_location} ne '') { 
+		$dom->createInternalSubset ('data', undef, $self->{dtd_location});
 	}
 		
-	$root = $dom->createElement ($self->{'root-name'});
+	$root = $dom->createElement ($self->{root_name});
 		
 	$dom->setDocumentElement ($root);
 	
 	# dump config options if any
-	foreach (qw(ref-element hash-element array-element empty-array empty-hash undef key-as-hash-element)) {
+	foreach (qw(ref_element hash_element array_element empty_array empty_hash undef key_as_hash_element @key_as_attribute)) {
 		$root->setAttribute ($_, $self->{$_})
 			if $self->{$_} ne $defaults->{$_};
 	}
 	
-	if (scalar keys %{$self->{'namespace'}}) {
-		foreach my $key (keys %{$self->{'namespace'}}) {
-			$root->setAttribute ($key, $self->{'namespace'}->{$key});
+	if (scalar keys %{$self->{namespace}}) {
+		foreach my $key (keys %{$self->{namespace}}) {
+			$root->setAttribute ($key, $self->{namespace}->{$key});
 			#debug "add '$key' namespace";
 		}
 	}
 	
-	$self->{'references'} = {};
-	$self->{'ref-count'} = 0;
-	$self->{'used'} = {};
+	$self->{references} = {};
+	$self->{ref_count} = 0;
+	$self->{used} = {};
 	
-	$self->analyze ($structure);
+	# $self->analyze ($structure);
 	
 	#my $refs = $self->{'references'};
 	#
@@ -165,40 +115,33 @@ sub dump_xml {
 	
 	$self->simple_dump ($structure);
 	
-	return $self->{'doc-object'};
+	return $self->{doc_object};
 	
-}
-############################################################
-sub hiding {
-	my $rval = shift;
-	
-	unless ("$rval" =~ /^(?:([^=]+)=)?([A-Z]+)\(0x([^\)]+)\)$/) {
-		# $tag->appendText ('this structure cannot be dumped' . overload::StrVal($rval) );
-		return;
-	}
-	
-	return ($1, $2, $3);
 }
 ############################################################
 sub simple_dump {
 	my $self  = shift;
 	my $rval  = \$_[0]; shift;
 	
-	my $dom   = $self->{'doc-object'};
+	my $dom   = $self->{doc_object};
 
 	my $tag   = shift || $dom->documentElement;
 	my $deref = shift;
 
 	$rval = $$rval if $deref;
 	
-	my $ref_element   = $self->{'ref-element'};
-	my $array_element = $self->{'array-element'};
-	my $hash_element  = $self->{'hash-element'};
-	my $empty_array   = $self->{'empty-array'};
-	my $undef         = $self->{'undef'};
-	my $empty_hash    = $self->{'empty-hash'};
+	my $ref_element   = $self->{ref_element};
+	my $array_element = $self->{array_element};
+	my $hash_element  = $self->{hash_element};
+	my $empty_array   = $self->{empty_array};
+	my $undef         = $self->{undef};
+	my $empty_hash    = $self->{empty_hash};
 	
-	my ($class, $type, $id) = hiding ($rval);
+	my ($class, $type, $id) = (
+		Scalar::Util::blessed ($rval),
+		Scalar::Util::reftype ($rval),
+		Scalar::Util::refaddr ($rval)
+	);
 	
 	if (defined $class) {
 		if ($class eq 'XML::LibXML::Element') {
@@ -242,26 +185,26 @@ sub simple_dump {
 			#	$rval->TO_XML;
 			#}
 
-			$tag->setAttribute ('class', $class);
+			$tag->setAttribute (class => $class);
 		}
 	}
 	
-	if (my $ref_no = $self->refs ($id)) {
-		if (defined $self->{'used'}->{$id}
-			and $self->{'used'}->{$id} eq 'yea'
-		) {
-		  
-			my $node = $tag->addNewChild ('', $ref_element);
-			$node->setAttribute ('to', $ref_no);
-			return;
-		
-		} else {
-			
-			$tag->setAttribute ('id', $ref_no);
-			$self->{'used'}->{$id} = 'yea';
-		
-		}
-	}
+	#if (my $ref_no = $self->refs ($id)) {
+	#	if (defined $self->{'used'}->{$id}
+	#		and $self->{'used'}->{$id} eq 'yea'
+	#	) {
+	#	  
+	#		my $node = $tag->addNewChild ('', $ref_element);
+	#		$node->setAttribute ('to', $ref_no);
+	#		return;
+	#	
+	#	} else {
+	#		
+	#		$tag->setAttribute ('id', $ref_no);
+	#		$self->{'used'}->{$id} = 'yea';
+	#	
+	#	}
+	#}
 	
 	if ($type eq "SCALAR" || $type eq "REF"){
 		
@@ -287,7 +230,7 @@ sub simple_dump {
 		
 		} elsif (not defined $$rval) {
 		
-			$tag->addNewChild ('', $self->{'undef'});
+			$tag->addNewChild ('', $self->{undef});
 		
 		} else {	
 		
@@ -302,7 +245,7 @@ sub simple_dump {
 		my @array;
 		
 		unless (scalar @$rval){
-			$tag->addNewChild ('', $self->{'empty-array'});
+			$tag->addNewChild ('', $self->{empty_array});
 			return;
 		}
 		
@@ -323,7 +266,7 @@ sub simple_dump {
 					$node = $tag->parentNode->addNewChild ('', $tag_name);
 				} else {
 					$node = $tag;
-					$tag->removeAttribute ('option');
+					$tag->removeAttribute ('opt');
 				}
 				# $tag->setAttribute ('idx', $idx);
 			} else {
@@ -336,64 +279,20 @@ sub simple_dump {
 		
 		return;
 	} elsif ($type eq "HASH") {
-	
-		unless (scalar keys %$rval) {
 		
-			$tag->addNewChild ('', $self->{'empty-hash'});
+		my @keys = keys %$rval;
+		
+		unless (scalar @keys) {
+			$tag->addNewChild ('', $self->{empty_hash});
 			return;
 		}
+			
+		@keys = sort @keys
+			if $self->{sort_keys};
 		
-		foreach my $key (sort keys %$rval) {
+		# $self->dump_hashref ($rval, \@keys, $tag, $class, $type, $id);
+		$self->dump_hashref_pp ($rval, \@keys, $tag, $class, $type, $id);
 		
-			my $val = \$rval->{$key};
-			
-			# warn "key: $key, value: $val\n";
-			
-			my $node;
-			if ($key =~ /^(\<)?([^\d\W][\w-]*)$/) {
-				if (
-					$self->{'key-as-hash-element'}
-					and $key ne $array_element # for RSS
-					and $key ne $hash_element
-					and $key ne $ref_element
-					and $key ne $empty_array
-					and $key ne $empty_hash
-					and $key ne $undef
-					#and $key ne $self->{'root-name'}
-				) {
-					$node = $tag->addNewChild ('', $2);
-					# debug "child name: $2";
-					if (defined $1 and $1 eq '<') {
-						$node->setAttribute ('option', 'level-up'); 
-					}
-				}
-			
-			} elsif (
-				$key =~ /^\@([^\d\W][\w-]*)$/ and $self->{'@key-as-attribute'}	
-			) {
-				my $attr_name = $1;
-				my ($class, $type, $id) = hiding ($$val);
-				# TODO: make something with values other than scalar ref
-				unless (defined $type) {
-					$tag->setAttribute ($attr_name, $$val);
-					next;
-				}
-			} elsif ($key =~ /^\#text$/) {
-				my ($class, $type, $id) = hiding ($$val);
-				unless (defined $type) {
-					$tag->appendText ($$val);
-					next;
-				}
-			} else {
-			
-			
-				$node = $tag->addNewChild ('', $self->{'hash-element'});
-				$node->setAttribute ('name', $key);
-			}
-
-			$self->simple_dump ($$val, $node);
-		}
-	
 		return;
 	
 	} elsif ($type eq "GLOB") {
@@ -415,7 +314,78 @@ sub simple_dump {
 	die "Assert";
 }
 ############################################################
+sub key_info_pp {
+	my $self = shift;
+	my ($rval, $key, $val_ref) = @_;
+	
+	my $key_prefix = substr $key, 0, 1;
+	my $key_name   = substr $key, 1;
+	
+	if ($key_prefix ne '@' and $key_prefix ne '#' and $key_prefix ne '<') {
+		$key_name = $key;
+	}
+	
+	my $val_type = Scalar::Util::reftype ($val_ref);
+	
+	# [4]   	NameStartChar	   ::=   	":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
+	# [4a]   	NameChar	   ::=   	NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
+	my $key_can_be_tag = $key_name =~ /^[a-zA-Z\:\_][\w\d\_\-\:\.]$/;
+	
+	return ($key_prefix, $key_name, $val_type, $key_can_be_tag);
+	
+}
+############################################################
+sub dump_hashref_pp {
+	my $self = shift;
+	my ($rval, $keys, $tag, $class, $type, $id) = @_;
+	
+	foreach my $key (@$keys) {
+		
+		my $val = \$rval->{$key};
+		my $node;
 
+		my ($key_prefix, $key_name, $val_type, $key_can_be_tag) =
+			$self->key_info ($rval, $key, $$val);
+		
+		if ($key_can_be_tag) {
+			if (defined $key_prefix and $key_prefix eq '@' and $self->{'@key_as_attribute'}) {
+				# TODO: make something with values other than scalar ref
+				
+				unless (defined $val_type) {
+					$tag->setAttribute ($key_name, $$val);
+					next;
+				}
+				
+			} elsif (defined $key_prefix and $key_prefix eq '#' and $key_name eq 'text') {
+				unless (defined $val_type) {
+					$tag->appendText ($$val);
+					next;
+				}
+			} elsif (
+				$self->{key_as_hash_element}
+				and $key ne $self->{array_element} # for RSS
+				and $key ne $self->{hash_element}
+				and $key ne $self->{ref_element}
+				and $key ne $self->{empty_array}
+				and $key ne $self->{empty_hash}
+				and $key ne $self->{undef}
+			) {
+				$node = $tag->addNewChild ('', $key_name);
+				if (defined $key_prefix and $key_prefix eq '<') {
+					$node->setAttribute (opt => 'level-up');
+				}
+			}
+		} else {
+			$node = $tag->addNewChild ('', $self->{hash_element});
+			$node->setAttribute ('name', $key);
+		}
+		
+		$self->simple_dump ($$val, $node);
+	}
+	
+}
+
+############################################################
 __END__
 
 =head1 NAME
@@ -496,9 +466,11 @@ localize the effect. For example:
 		'empty-hash'          => 'empty-hash',
 		'undef'               => 'undef',
 		'key-as-hash-element' => 1,
+		'@key-as-attribute'   => 1,
 
 		# options
 		'sort-keys'           => 0,
+		'granted-restore'     => 1,
 	}
 
 Data::DumpXML is function-oriented, but this module is rewritten
@@ -562,6 +534,14 @@ correspondending regexp /^(?:[^\d\W]|:)[\w:-]*$/ dumped as:
 	instead of 
 
 	<$hashelement name="$keyname">$keyvalue</$hashelement>
+
+=item @key-as-attribute
+
+TODO
+
+=item granted_restore
+
+TODO
 
 =back
 
