@@ -1,3 +1,15 @@
+2009-06-08	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 1.17
+
+	Fixed thread unsafety bug
+	
+	Fixed issue with localized version in XS
+	
+	Now benchmark contains also tests for 
+		Storable (52x dump / 83x parse faster than Data::Dump::XML) and
+		JSON::XS (35x dump / 72x parse faster)
+
 2009-06-07	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 1.16

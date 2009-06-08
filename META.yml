@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Data-Dump-XML
-version:            1.16
+version:            1.17
 abstract:           ~
 author:
     - Ivan Baktsheev <dot.and.thing@gmail.com>

@@ -33,7 +33,7 @@ package Data::Dump::XML::Parser;
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 #  ---
-#  $Id: Parser.pm,v 1.3 2009/06/07 20:25:32 apla Exp $
+#  $Id: Parser.pm,v 1.16 2009/06/07 20:22:56 apla Exp $
 #  ---
 
 use Class::Easy;
@@ -207,8 +207,6 @@ sub characters {
 	my ($p, $str) = @_;
 	$p->{'char'} .= $str->{'Data'}
 		if defined $str->{'Data'} and $str->{'Data'} !~ /^\s$/s;
-	
-	# $p->SUPER::characters ($str);
 }
 
 sub end_element {
@@ -266,16 +264,14 @@ sub end_element {
 			if defined $class and ref $$ref;
 
 	}
-	$$depth--;
 	
-	# $p->SUPER::end_element ($element);
+	$$depth--;
 }
 
 sub end_document {
 	my $p = shift;
 	my $data = $p->{'data'};
 	
-	#$p->SUPER::end_document (@_);
 	return $data;
 }
 

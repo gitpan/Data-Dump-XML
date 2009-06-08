@@ -56,6 +56,21 @@ if (try_to_use ('XML::Simple')) {
 	# $parser_bench->{'XML::Simple'} = sub {XML::Simple::XMLin ($xml_string_simple)};
 }
 
+my $json_string_dumper;
+
+if (try_to_use ('JSON')) {
+	$dumper_bench->{'JSON'} = sub {$json_string_dumper = JSON::to_json ($data)};
+	$parser_bench->{'JSON'} = sub {JSON::from_json ($json_string_dumper)};
+}
+
+my $storable;
+
+if (try_to_use ('Storable')) {
+	$dumper_bench->{'Storable'} = sub {$storable = Storable::freeze ($data)};
+	$parser_bench->{'Storable'} = sub {Storable::thaw ($storable)};
+}
+
+
 Benchmark::cmpthese (1000, $dumper_bench);
 Benchmark::cmpthese (1000, $parser_bench);
 

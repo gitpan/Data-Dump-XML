@@ -1,6 +1,6 @@
 package Data::Dump::XML;
-# $Revision: 1.3 $
-# $Id: XML.pm,v 1.3 2009/06/07 20:25:32 apla Exp $
+# $Revision: 1.17 $
+# $Id: XML.pm,v 1.17 2009/06/07 22:14:21 apla Exp $
 # $Author: apla $
 
 use Class::Easy;
@@ -9,7 +9,7 @@ use Scalar::Util ();
 
 use XML::LibXML ();
 
-our $VERSION = 1.16;
+our $VERSION = '1.17'; # avoid locale issues by stringified version
 
 require XSLoader;
 XSLoader::load ('Data::Dump::XML', $VERSION);
@@ -49,7 +49,7 @@ sub new {
 	my $class   = shift;
 	my $params  = {@_};
 	
-	my $config = \%$defaults;
+	my $config = {%$defaults};
 	
 	foreach my $key (keys %$params) {
 		if (exists $config->{$key}) {
@@ -399,6 +399,10 @@ as XML::LibXML object
  my $dumper = Data::Dump::XML->new;
  $xml = $dumper->dump_xml (@list);
 
+=head1 PROJECT
+
+Project source code and repository available on L<http://sourceforge.net/projects/web-app>.
+
 =head1 DESCRIPTION
 
 This module completely rewritten from Gisle Aas
@@ -570,11 +574,13 @@ Ivan Baktsheev <dot.and.thing@gmail.com>, based on C<Data::DumpXML>.
 The C<Data::Dump> module was written by Gisle Aas, based on
 C<Data::Dumper> by Gurusamy Sarathy <gsar@umich.edu>.
 
- Copyright 2003-2009 Ivan Baktcheev.
- Copyright 1998-2003 Gisle Aas.
- Copyright 1996-1998 Gurusamy Sarathy.
+	Copyright 2003-2009 Ivan Baktcheev.
+	Copyright 1998-2003 Gisle Aas.
+	Copyright 1996-1998 Gurusamy Sarathy.
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
+
+L<http://perlhug.com>
 
 =cut

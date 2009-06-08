@@ -11,5 +11,4 @@ t/002-ref_info.t
 t/003-large.t
 t/benchmark.pl
 t/xml.xml
-ppport.h
 XML.xs
