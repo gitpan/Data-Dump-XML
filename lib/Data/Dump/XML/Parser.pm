@@ -46,6 +46,9 @@ use Data::Dump::XML;
 
 our $VERSION = 1.16;
 
+# require XSLoader;
+# XSLoader::load ('Data::Dump::XML::Parser', $VERSION);
+
 #*characters = \&Data::Dump::XML::characters;
 
 sub new {
@@ -89,13 +92,16 @@ sub start_element {
 	$p->{max_depth} = $$depth;
 	
 	if ($$depth == 1) {
-		# warn $tag;
+		
+		$d->{'root_name'} = $tag;
+		
 		foreach (qw(ref_element hash_element array_element empty_array
-			empty_hash undef key_as_hash_element @key_as_attribute)
+			empty_hash undef key_as_hash_element @key_as_attribute hash_element_attribute_name)
 		) {
 			$d->{$_} = delete $attr{"_$_"} 
 				if exists $attr{"_$_"};
 		}
+		
 	}
 	
 	my $key_as_hash_element = $d->{'key_as_hash_element'};
@@ -165,22 +171,22 @@ sub start_element {
 		$$ref = [];
 		push @{$p->{'stack'}}, undef;
 	
-	} elsif ($key_as_hash_element or ($tag eq $hash_element and exists $attr{_name})) {
+	} elsif ($key_as_hash_element or ($tag eq $hash_element and exists $attr{$d->{hash_element_attribute_name}})) {
 		#$$ref = {}
 		#	if $defined_parent;
 		
 		my $key = $tag;
-		$key = $attr{_name}
-			if exists $attr{_name};
+		$key = delete $attr{$d->{hash_element_attribute_name}}
+			if exists $attr{$d->{hash_element_attribute_name}};
 		
 		die "hash element '$key' must appear in hash context" 
 			if defined $$ref and Scalar::Util::reftype ($$ref) ne 'HASH';
 		
 		unless (defined $$ref) {
-			# copy all attributes except :*
+			# copy all attributes except _*
 			foreach my $k (keys %$parent_attr) {
 				# next if substr ($k, 0, 1) eq '_';
-				$$ref->{"\@$k"} = $parent_attr->{$k}; 
+				$$ref->{"\@$k"} = $parent_attr->{$k};
 			}
 		}
 		
@@ -225,14 +231,22 @@ sub end_element {
 	my $attr = pop @{$p->{'attr'}};
 	my $attributed_keys = {map {$_ => $attr->{$_}} grep {!/^_/} keys %$attr};
 	
-	my $empty_array_item_as_hash = scalar keys %$attributed_keys;
+	my $has_attrs = scalar keys %$attributed_keys;
 	
 	if( $$depth < $p->{max_depth}) {
 		#print ' 'x $$depth, "- this element had children\n";
 	} else {
 		# here processing for empty tags
 		
-		if ($tag eq $d->{array_element} and $empty_array_item_as_hash) {
+		#my $key = $tag;
+		#$key = delete $attr{$d->{hash_element_attribute_name}}
+		#	if exists $attr{$d->{hash_element_attribute_name}};
+
+
+		if (
+			# ($tag eq $d->{array_element} or $tag eq $d->{hash_element}) and
+			$has_attrs
+		) {
 			$$ref->{'#text'} = $str
 				if defined $str and $str ne '';
 	

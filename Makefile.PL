@@ -10,5 +10,9 @@ WriteMakefile(
 		'XML::LibXML'  => 1.60,
 		'Scalar::Util' => 1,
 		'IO::Easy'     => 0.01,
+	},
+	XS => {
+		'XML.xs' => 'XML.c',
+		'Parser.xs' => 'Parser.c',
 	}
 );

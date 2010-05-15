@@ -1,7 +1,4 @@
 package Data::Dump::XML;
-# $Revision: 1.17 $
-# $Id: XML.pm,v 1.17 2009/06/07 22:14:21 apla Exp $
-# $Author: apla $
 
 use Class::Easy;
 
@@ -9,7 +6,7 @@ use Scalar::Util ();
 
 use XML::LibXML ();
 
-our $VERSION = '1.17'; # avoid locale issues by stringified version
+our $VERSION = '1.18'; # avoid locale issues by stringified version
 
 require XSLoader;
 XSLoader::load ('Data::Dump::XML', $VERSION);
@@ -30,6 +27,7 @@ our $defaults = {
 	empty_hash          => 'empty-hash',
 	undef               => 'undef',
 	key_as_hash_element => 1,
+	hash_element_attribute_name => '_name',
 	'@key_as_attribute' => 1,
 	
 	# options
@@ -64,7 +62,7 @@ sub new {
 ############################################################
 sub dump_xml {
 	my $self = shift;
-
+	
 	my $structure;
 
 	if ( (scalar @_) == 1) {
@@ -377,7 +375,7 @@ sub dump_hashref_pp {
 			}
 		} else {
 			$node = $tag->addNewChild ('', $self->{hash_element});
-			$node->setAttribute (_name => $key);
+			$node->setAttribute ($self->{hash_element_attribute_name}, $key);
 		}
 		
 		$self->simple_dump ($$val, $node);

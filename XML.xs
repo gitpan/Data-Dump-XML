@@ -10,9 +10,7 @@ characters (p, str)
     HV * str
 PREINIT:
 	SV **  val_p;
-	SV *   val;
 	char * val_str;
-	int last_sig;
 	char * value;
 	SV **  hash_p;
 CODE:
@@ -47,7 +45,6 @@ ref_info (sv)
 PREINIT:
 	char * class;
 	char * type;
-	STRLEN len;
 	unsigned int id;
 PPCODE:
 {
@@ -76,19 +73,17 @@ PPCODE:
 }
 
 void
-dump_hashref (self, rval, keys, tag, class, type, id)
+dump_hashref (self, rval, keys, tag)
 		SV * self
 		HV * rval
 		AV * keys
 		SV * tag
 	PREINIT:
 		int i;
-		int keys_len;
 		SV * val;
 		char * key;
 		SV ** val_p;
 		SV ** key_p;
-		SV * node;
 		char key_prefix;
 		char * key_name;
 		char * ref_type;
@@ -164,7 +159,6 @@ key_info (self, hashref, key, val)
 		char key_prefix;
 		char * key_name;
 		char * ref_type;
-		STRLEN len ;
 		char * key_walk;
 		bool key_can_be_tag = 1;
 		bool namespace = 0;

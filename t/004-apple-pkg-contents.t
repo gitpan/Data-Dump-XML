@@ -8,13 +8,11 @@ use IO::Easy;
 
 use Test::More qw(no_plan);
 
-use Benchmark;
-
 use_ok 'Data::Dump::XML';
 use_ok 'Data::Dump::XML::Parser';
 
-my $file_name = shift || 't/xml.xml';
-$file_name = 't/Data-Dump-XML/xml.xml' 
+my $file_name = shift || 't/apple-pkg-contents.xml';
+$file_name = 't/Data-Dump-XML/apple-pkg-contents.xml' 
 	unless -f $file_name;
 
 $Class::Easy::DEBUG = 'immediately';
@@ -29,17 +27,9 @@ my $xml;
 $data = $parser->parse_string ($contents);
 $xml = $dumper->dump_xml ($data);
 
-for (0 .. 10) {
-	my $t = timer ("parsing file");
-	$data = $parser->parse_string ($contents);
-	$t->lap ('dumping data');
-	$xml = $dumper->dump_xml ($data);
-	$t->end;
-}
+# warn Dumper $data;
 
-#my $file_name2 = $file_name;
-#$file_name2 =~ s/xml\.xml/xml2\.xml/;
-#
-#IO::Easy->new ($file_name2)->as_file->store ($xml->toString(1));
+ok $data->{mysql}->{'@pt'} eq '/tmp/destroot/mysql/';
+ok $data->{mysql}->{Library}->{LaunchDaemons}->{'com.mysql.mysqld.plist'}->{'@p'} eq 33188;
 
 1;

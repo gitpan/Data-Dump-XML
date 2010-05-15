@@ -9,6 +9,8 @@ t/000-basic-dump.t
 t/001-key_info.t
 t/002-ref_info.t
 t/003-large.t
+t/004-apple-pkg-contents.t
+t/apple-pkg-contents.xml
 t/benchmark.pl
 t/xml.xml
 XML.xs
