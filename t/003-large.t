@@ -37,9 +37,11 @@ for (0 .. 10) {
 	$t->end;
 }
 
-#my $file_name2 = $file_name;
-#$file_name2 =~ s/xml\.xml/xml2\.xml/;
-#
-#IO::Easy->new ($file_name2)->as_file->store ($xml->toString(1));
+if ($ENV{DEBUG}) {
+	my $file_name2 = $file_name;
+	$file_name2 =~ s/xml\.xml/xml2\.xml/;
+
+	IO::Easy->new ($file_name2)->as_file->store ($xml->toString(1));
+}
 
 1;

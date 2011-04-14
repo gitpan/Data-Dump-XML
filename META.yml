@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Data-Dump-XML
-version:            1.18
+version:            1.19
 abstract:           ~
 author:
     - Ivan Baktsheev <dot.and.thing@gmail.com>
@@ -11,15 +11,14 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    Class::Easy:   0.02
-    IO::Easy:      0.01
-    Scalar::Util:  1
-    XML::LibXML:   1.6
+    Class::Easy:  0.16
+    IO::Easy:     0.01
+    XML::LibXML:  1.6
 no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.54
+generated_by:       ExtUtils::MakeMaker version 6.56
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4

@@ -38,13 +38,11 @@ package Data::Dump::XML::Parser;
 
 use Class::Easy;
 
-use Scalar::Util ();
-
 use base qw(XML::LibXML::SAX);
 
 use Data::Dump::XML;
 
-our $VERSION = 1.16;
+our $VERSION = 1.19;
 
 # require XSLoader;
 # XSLoader::load ('Data::Dump::XML::Parser', $VERSION);
@@ -96,7 +94,7 @@ sub start_element {
 		$d->{'root_name'} = $tag;
 		
 		foreach (qw(ref_element hash_element array_element empty_array
-			empty_hash undef key_as_hash_element @key_as_attribute hash_element_attribute_name)
+			empty_hash undef key_as_hash_element at_key_as_attribute hash_element_attribute_name)
 		) {
 			$d->{$_} = delete $attr{"_$_"} 
 				if exists $attr{"_$_"};
@@ -138,7 +136,7 @@ sub start_element {
 		
 		###  check the data type
 		die "'$tag' elements only appear in list elements" 
-			if defined $$ref and Scalar::Util::reftype ($$ref) ne 'ARRAY';
+			if defined $$ref and Data::Dump::XML::reftype ($$ref) ne 'ARRAY';
 		
 		push @{$$ref}, undef;
 		push @{$p->{'stack'}}, \($$ref->[-1]);
@@ -180,7 +178,7 @@ sub start_element {
 			if exists $attr{$d->{hash_element_attribute_name}};
 		
 		die "hash element '$key' must appear in hash context" 
-			if defined $$ref and Scalar::Util::reftype ($$ref) ne 'HASH';
+			if defined $$ref and Data::Dump::XML::reftype ($$ref) ne 'HASH';
 		
 		unless (defined $$ref) {
 			# copy all attributes except _*
@@ -212,7 +210,7 @@ sub start_element {
 sub characters {
 	my ($p, $str) = @_;
 	$p->{'char'} .= $str->{'Data'}
-		if defined $str->{'Data'} and $str->{'Data'} !~ /^\s$/s;
+		if defined $str->{'Data'};
 }
 
 sub end_element {

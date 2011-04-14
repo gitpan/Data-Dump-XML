@@ -2,11 +2,9 @@ package Data::Dump::XML;
 
 use Class::Easy;
 
-use Scalar::Util ();
-
 use XML::LibXML ();
 
-our $VERSION = '1.18'; # avoid locale issues by stringified version
+our $VERSION = '1.19'; # avoid locale issues by stringified version
 
 require XSLoader;
 XSLoader::load ('Data::Dump::XML', $VERSION);
@@ -28,11 +26,12 @@ our $defaults = {
 	undef               => 'undef',
 	key_as_hash_element => 1,
 	hash_element_attribute_name => '_name',
-	'@key_as_attribute' => 1,
+	at_key_as_attribute => 1,
 	
 	# options
 	sort_keys           => 0,
 	granted_restore     => 1,
+	ignore_bless        => 0,
 	
 	# internal structure
 	doc_object          => undef,
@@ -54,6 +53,10 @@ sub new {
 			$config->{$key} = $params->{$key};
 		}
 	}
+
+	if (exists $config->{'@key_as_attribute'}) {
+		$config->{at_key_as_attribute} = delete $config->{'@key_as_attribute'};
+	}
 	
 	bless $config, $class;
 	
@@ -62,31 +65,38 @@ sub new {
 ############################################################
 sub dump_xml {
 	my $self = shift;
-	
-	my $structure;
 
-	if ( (scalar @_) == 1) {
-		$structure = shift;
-	} else {
-		$structure = \@_;
-	}
-	
+	my $structure;
+	my $root;
+
 	my $dom = XML::LibXML->createDocument ('1.0', $self->{encoding});
-	
 	$self->{doc_object} = $dom;
 	
-	my $root;
 	
 	if ($self->{dtd_location} ne '') { 
 		$dom->createInternalSubset ('data', undef, $self->{dtd_location});
 	}
 		
 	$root = $dom->createElement ($self->{root_name});
-		
 	$dom->setDocumentElement ($root);
+
+
+	if ((scalar @_) == 1) {
+		$structure = shift;
+
+		if (blessed ($structure) and $structure->can ('TO_XML')) {
+			$root->setAttribute (_class => blessed ($structure));
+			$structure = $structure->TO_XML;
+			$root->setAttribute (_to_xml => 1);
+		}
+
+	} else {
+		$structure = \@_;
+	}
+	
 	
 	# dump config options if any
-	foreach (qw(ref_element hash_element array_element empty_array empty_hash undef key_as_hash_element @key_as_attribute)) {
+	foreach (qw(ref_element hash_element array_element empty_array empty_hash undef key_as_hash_element at_key_as_attribute)) {
 		$root->setAttribute ("_$_", $self->{$_})
 			if $self->{$_} ne $defaults->{$_};
 	}
@@ -136,9 +146,9 @@ sub simple_dump {
 	my $empty_hash    = $self->{empty_hash};
 	
 	my ($class, $type, $id) = (
-		Scalar::Util::blessed ($rval),
-		Scalar::Util::reftype ($rval),
-		Scalar::Util::refaddr ($rval)
+		blessed ($rval),
+		reftype ($rval),
+		refaddr ($rval)
 	);
 	
 	if (defined $class) {
@@ -176,14 +186,19 @@ sub simple_dump {
 			return;
 		} elsif ($class ne '') {
 			
-			# TODO: make support for calling $rval->DUMP
-			# to get structure for dumping
-			
-			#if ($rval->can ('TO_XML')) {
-			#	$rval->TO_XML;
-			#}
-
 			$tag->setAttribute (_class => $class);
+			
+			if ($rval->can ('TO_XML')) {
+				$rval = $rval->TO_XML;
+				$tag->setAttribute (_to_xml => 1);
+				($class, $type, $id) = (
+					blessed ($rval),
+					reftype ($rval),
+					refaddr ($rval)
+				);
+			}
+			
+
 		}
 	}
 	
@@ -288,8 +303,8 @@ sub simple_dump {
 		@keys = sort @keys
 			if $self->{sort_keys};
 		
-		# $self->dump_hashref ($rval, \@keys, $tag, $class, $type, $id);
-		$self->dump_hashref_pp ($rval, \@keys, $tag, $class, $type, $id);
+		#$self->dump_hashref ($rval, \@keys, $tag);
+		$self->dump_hashref_pp ($rval, \@keys, $tag);
 		
 		return;
 	
@@ -323,7 +338,7 @@ sub key_info_pp {
 		$key_name = $key;
 	}
 	
-	my $val_type = Scalar::Util::reftype ($val_ref);
+	my $val_type = reftype ($val_ref);
 	
 	# [4]   	NameStartChar	   ::=   	":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
 	# [4a]   	NameChar	   ::=   	NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
@@ -335,7 +350,7 @@ sub key_info_pp {
 ############################################################
 sub dump_hashref_pp {
 	my $self = shift;
-	my ($rval, $keys, $tag, $class, $type, $id) = @_;
+	my ($rval, $keys, $tag) = @_;
 	
 	foreach my $key (@$keys) {
 		
@@ -346,7 +361,7 @@ sub dump_hashref_pp {
 			$self->key_info ($rval, $key, $$val);
 		
 		if ($key_can_be_tag) {
-			if (defined $key_prefix and $key_prefix eq '@' and $self->{'@key_as_attribute'}) {
+			if (defined $key_prefix and $key_prefix eq '@' and $self->{at_key_as_attribute}) {
 				# TODO: make something with values other than scalar ref
 				
 				unless (defined $val_type) {

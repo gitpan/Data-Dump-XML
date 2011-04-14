@@ -109,6 +109,16 @@ ok $xml_string =~ /<rss version="2\.0">/s;
 ok $xml_string =~ /<guid isPermaLink="true">/s;
 ok $xml_string =~ /<guid isPermaLink="true">/s;
 
+my $s = "<iPad_MN>&gt; \x{437}</iPad_MN>";
+
+my $xml_parser = Data::Dump::XML::Parser->new;
+
+my $str = $xml_parser->parse_string($s);
+
+ok length($str) == 3;
+
+ok substr ($str, -1) eq "\x{437}";
+
 
 
 1;

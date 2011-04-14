@@ -6,9 +6,8 @@ WriteMakefile(
 	'dist' => { COMPRESS=>"gzip", SUFFIX=>"gz" },
 	AUTHOR => 'Ivan Baktsheev <dot.and.thing@gmail.com>',
 	PREREQ_PM => {
-		'Class::Easy'  => 0.02, # try_to_use support
+		'Class::Easy'  => 0.16, # try_to_use support
 		'XML::LibXML'  => 1.60,
-		'Scalar::Util' => 1,
 		'IO::Easy'     => 0.01,
 	},
 	XS => {

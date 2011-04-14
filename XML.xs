@@ -147,7 +147,54 @@ dump_hashref (self, rval, keys, tag)
 		
 		// warn ("Hello from XS\n");
 
-		
+char *
+blessed(sv)
+	SV * sv
+PROTOTYPE: $
+CODE: 
+{
+	if (SvMAGICAL(sv))
+	mg_get(sv);
+	if(!(SvROK(sv) && SvOBJECT(SvRV(sv)))) {
+		XSRETURN_UNDEF;
+	}
+	RETVAL = (char*)sv_reftype(SvRV(sv),TRUE);
+}
+OUTPUT:
+	RETVAL
+
+char *
+reftype(sv)
+	SV * sv
+PROTOTYPE: $
+CODE: 
+{
+	if (SvMAGICAL(sv))
+		mg_get(sv);
+	if(!SvROK(sv)) {
+		XSRETURN_UNDEF;
+	}
+	RETVAL = (char*)sv_reftype(SvRV(sv),FALSE);
+}
+OUTPUT:
+	RETVAL
+
+UV
+refaddr(sv)
+	SV * sv
+PROTOTYPE: $
+CODE: 
+{
+	if (SvMAGICAL(sv))
+		mg_get(sv);
+	if(!SvROK(sv)) {
+		XSRETURN_UNDEF;
+	}
+	RETVAL = PTR2UV(SvRV(sv));
+}
+OUTPUT:
+	RETVAL
+
 void
 key_info (self, hashref, key, val)
 		SV * self
